@@ -1,6 +1,7 @@
 class User < ApplicationRecord
-  attr_accessor :remember_token
+  attr_accessor :remember_token, :activation_token
   before_save { self.email.downcase! }
+  before_create :create_activation_digest
   validates :name, presence: true, length: { maximum: 50 }
   VALID_EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+\z/i
   validates :email, presence: true, length: { maximum: 255 },
@@ -22,15 +23,31 @@ class User < ApplicationRecord
 
   def remember
     self.remember_token = User.new_token
-    update_attribute(:remember_digest, User.digest(remember_token))
+    self.update_attribute(:remember_digest, User.digest(remember_token))
   end
 
-  def authenticated?
-    return false if remember_digest.nil?
-    BCrypt::Password.new(remember_digest).is_password?(remember_token)
+  def authenticated?(attribute, token)
+    digest = self.send("#{attribute}_digest")
+    return false if digest.nil?
+    BCrypt::Password.new(digest).is_password?(token)
   end
 
   def forget
-    update_attribute(:remember_digest, nil)
+    self.update_attribute(:remember_digest, nil)
+  end
+
+  def activate
+    self.update_attribute(:activated,    true)
+    self.update_attribute(:activated_at, Time.zone.now)
+  end
+
+  def send_activation_email
+    UserMailer.account_activation(self).deliver_now
+  end
+
+  private
+  def create_activation_digest
+    self.activation_token = User.new_token
+    self.activation_digest = User.digest(activation_token)
   end
 end
