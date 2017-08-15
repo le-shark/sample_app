@@ -1,4 +1,5 @@
 class User < ApplicationRecord
+  has_many :microposts, dependent: :destroy
   attr_accessor :remember_token, :activation_token
   before_save { self.email.downcase! }
   before_create :create_activation_digest
@@ -43,6 +44,10 @@ class User < ApplicationRecord
 
   def send_activation_email
     UserMailer.account_activation(self).deliver_now
+  end
+
+  def feed
+    Micropost.where("user_id = ?", id)
   end
 
   private
